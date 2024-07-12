@@ -11,6 +11,8 @@ from datetime import datetime
 from django.db.models import Sum
 from django.shortcuts import render, redirect
 from transactions.forms import WithdrawForm, TransferForm
+from django.core.mail import EmailMessage,EmailMultiAlternatives
+from django.template.loader import render_to_string
 from transactions.models import Transaction
 from transactions.forms import (
     DepositForm,
@@ -18,6 +20,18 @@ from transactions.forms import (
     LoanRequestForm,
 )
 from transactions.models import Transaction
+
+def send_transactions_email(user,amount,subject,template):
+        
+        message = render_to_string(template, {
+        'user': user,
+        'amount': amount,
+        })
+        send_email = EmailMultiAlternatives(subject, '', to=[user.email])
+        send_email.attach_alternative(message,"text/html")
+        send_email.send()
+
+
 
 class TransactionCreateMixin(LoginRequiredMixin, CreateView):
     template_name = 'transactions/transaction_form.html'
@@ -66,37 +80,9 @@ class DepositMoneyView(TransactionCreateMixin):
             self.request,
             f'{"{:,.2f}".format(float(amount))}$ was deposited to your account successfully'
         )
-
+        
+        send_transactions_email(self.request.user,amount,"Deposite Message","transactions/deposite_email.html")
         return super().form_valid(form)
-
-
-# class WithdrawMoneyView(TransactionCreateMixin):
-#     form_class = WithdrawForm
-#     title = 'Withdraw Money'
-
-#     def get_initial(self):
-#         initial = {'transaction_type': WITHDRAWAL}
-#         return initial
-
-#     def form_valid(self, form):
-#         amount = form.cleaned_data.get('amount')
-
-#         if Transaction.objects.filter(bankrupt=True).exists():
-#             messages.error(self.request, 'The bank is bankrupt. You cannot withdraw money at this time.')
-#             return redirect('withdraw_money')
-
-#         self.request.user.account.balance -= form.cleaned_data.get('amount')
-#         # balance = 300
-#         # amount = 5000
-#         self.request.user.account.save(update_fields=['balance'])
-
-#         messages.success(
-#             self.request,
-#             f'Successfully withdrawn {"{:,.2f}".format(float(amount))}$ from your account'
-#         )
-
-#         return super().form_valid(form)
-
 class LoanRequestView(TransactionCreateMixin):
     form_class = LoanRequestForm
     title = 'Request For Loan'
@@ -115,7 +101,7 @@ class LoanRequestView(TransactionCreateMixin):
             self.request,
             f'Loan request for {"{:,.2f}".format(float(amount))}$ submitted successfully'
         )
-
+        send_transactions_email(self.request.user,amount,"Loan Request Message","transactions/loan_email.html")
         return super().form_valid(form)
     
 class TransactionReportView(LoginRequiredMixin, ListView):
@@ -209,7 +195,7 @@ class WithdrawMoneyView(TransactionCreateMixin):
             self.request,
             f'Successfully withdrawn {"{:,.2f}".format(float(amount))}$ from your account'
         )
-
+        send_transactions_email(self.request.user,amount,"Withdrawl Message","transactions/withdrawal_email.html")
         return super().form_valid(form)
 
 
